@@ -1,0 +1,7 @@
+parameters:
+    level: 8
+    paths: ['src', 'tests']
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    ignoreErrors:
+        - '#Attribute class JetBrains\\PhpStorm.*#'

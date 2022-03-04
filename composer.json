@@ -1,0 +1,32 @@
+{
+    "name": "phprtc/watcher",
+    "description": "Swoole File Watcher",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ahmard",
+            "email": "ahmardy@outlook.com"
+        }
+    ],
+    "require": {
+        "PHP": "^8.1",
+        "ext-inotify": "*",
+        "evenement/evenement": "^3.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^0.12.90",
+        "phpunit/phpunit": "^9.5",
+        "symfony/var-dumper": "^6.0",
+        "openswoole/ide-helper": "^4.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "RTC\\Watcher\\": "src/"
+        }
+    },
+    "scripts": {
+        "analyse" : "vendor/bin/phpstan analyse --debug",
+        "test" : "vendor/bin/phpunit"
+    }
+}
