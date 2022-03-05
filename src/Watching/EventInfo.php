@@ -2,6 +2,8 @@
 
 namespace RTC\Watcher\Watching;
 
+use JetBrains\PhpStorm\Pure;
+use RTC\Watcher\Event;
 use RTC\Watcher\Watcher;
 
 class EventInfo
@@ -13,17 +15,17 @@ class EventInfo
 
     public function __construct(
         protected array $event,
-        string $path
+        array $pathData
     )
     {
-        $this->watchedItem = new WatchedItem($path, $this);
+        $this->watchedItem = new WatchedItem($pathData['path'], $this);
         $this->eventMask = $this->event['mask'];
         $this->eventInfo = Watcher::$constants[$event['mask']];
     }
 
-    public function getMask(): int
+    public function getMask(): Event
     {
-        return $this->eventMask;
+        return Event::from($this->eventMask);
     }
 
     public function getName(): string
@@ -42,6 +44,11 @@ class EventInfo
     public function getEvent(): array
     {
         return $this->event;
+    }
+
+    #[Pure] public function getWatchDescriptor(): int
+    {
+        return $this->getEvent()['wd'];
     }
 
     /**

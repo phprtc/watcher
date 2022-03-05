@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace RTC\Watcher;
 
 
-use JetBrains\PhpStorm\Pure;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RTC\Watcher\Watching\EventInfo;
 use RTC\Watcher\Watching\EventTrait;
 use RTC\Watcher\Watching\WatchedItem;
@@ -12,21 +13,34 @@ use Swoole\Event as SWEvent;
 
 class Watcher
 {
-    use EventTrait;
+    use EventTrait {
+        EventTrait::__construct as private __eventTraitConstructor;
+    }
 
     protected mixed $inotifyFD;
     protected array $paths = [];
     protected array $extensions = [];
     protected array $watchedItems = [];
 
+    protected readonly int $maskItemCreated;
+    protected readonly int $maskItemDeleted;
+
     protected array $fileShouldNotEndWith = [
         '~'
     ];
 
 
-    #[Pure] public static function create(): Watcher
+    public static function create(): Watcher
     {
         return new Watcher();
+    }
+
+    public function __construct()
+    {
+        $this->__eventTraitConstructor();
+
+        $this->maskItemCreated = Event::ON_CREATE_HIGH->value;
+        $this->maskItemDeleted = Event::ON_DELETE_HIGH->value;
     }
 
     /**
@@ -58,24 +72,22 @@ class Watcher
      */
     public function watch(): void
     {
-        static $index = 1;
-
         // Register paths
         foreach ($this->paths as $path) {
-            $this->watchedItems[$index] = $path;
-            inotify_add_watch($this->getInotifyFD(), $path, $this->event->value);
-            $index += 1;
+            $this->registerInotifyEvent($path);
         }
 
         // Set up a new event listener for inotify read events
         SWEvent::add($this->getInotifyFD(), function () {
-            $events = inotify_read($this->getInotifyFD());
+            $inotifyEvents = inotify_read($this->getInotifyFD());
 
             // IF WE ARE LISTENING TO 'ON_ALL_EVENTS'
             if ($this->willWatchAny) {
-                foreach ($events as $event) {
-                    if (!empty($event['name'])) {   // Filter out invalid events
-                        $this->fireEvent($event);
+                foreach ($inotifyEvents as $inotifyEvent) {
+                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
+
+                    if ('' != $inotifyEvent['name']) {   // Filter out invalid events
+                        $this->fireEvent($inotifyEvent);
                     }
                 }
 
@@ -83,10 +95,12 @@ class Watcher
             }
 
             // INDIVIDUAL LISTENERS
-            foreach ($events as $event) {
+            foreach ($inotifyEvents as $inotifyEvent) {
+                $this->inotifyPerformAdditionalOperations($inotifyEvent);
+
                 // Make sure that we support this event
-                if (array_key_exists($event['mask'], self::$constants)) {
-                    $this->fireEvent($event);
+                if ('' != $inotifyEvent['name'] && $inotifyEvent['mask'] == $this->event->value) {
+                    $this->fireEvent($inotifyEvent);
                 }
             }
 
@@ -99,6 +113,67 @@ class Watcher
             null,
             SWOOLE_EVENT_READ
         );
+    }
+
+    /**
+     * Handles directory creation/deletion on the fly
+     *
+     * @param array $inotifyEvent
+     * @return void
+     */
+    private function inotifyPerformAdditionalOperations(array $inotifyEvent): void
+    {
+        // Handle directory creation
+        if ($inotifyEvent['mask'] == $this->maskItemCreated) {
+            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+            // Register this path also if it's directory
+            if ($eventInfo->getWatchedItem()->isDir()) {
+                $this->registerInotifyEvent($eventInfo->getWatchedItem()->getFullPath());
+            }
+
+            return;
+        }
+
+        // Handle directory deletion
+        if ($inotifyEvent['mask'] == $this->maskItemDeleted) {
+            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+            // Remove this path also if it's directory
+            if ($eventInfo->getWatchedItem()->isDir()) {
+                $this->removeInotifyEvent($eventInfo);
+            }
+        }
+    }
+
+    private function registerInotifyEvent(string $path): void
+    {
+        if (is_dir($path)) {
+            $iterator = new RecursiveDirectoryIterator($path);
+
+            // Loop through files
+            foreach (new RecursiveIteratorIterator($iterator) as $file) {
+                if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
+                    $descriptor = inotify_add_watch(
+                        $this->getInotifyFD(),
+                        $file->getRealPath(),
+                        Event::ON_ALL_EVENTS->value
+                    );
+
+                    $this->watchedItems[$descriptor] = [
+                        'path' => $file->getRealPath(),
+                        'mask' => $this->event->value,
+                    ];
+                }
+            }
+        }
+    }
+
+    public function removeInotifyEvent(EventInfo $eventInfo)
+    {
+        // Stop watching event
+        inotify_rm_watch($this->getInotifyFD(), $eventInfo->getWatchDescriptor());
+
+        // Stop tracking descriptor
+        unset($this->watchedItems[$eventInfo->getWatchDescriptor()]);
     }
 
     private function fireEvent(array $inotifyEvent): void
@@ -131,7 +206,7 @@ class Watcher
 
                 $eventMask = $this->willWatchAny
                     ? Event::ON_ALL_EVENTS->value
-                    : $eventInfo->getMask();
+                    : $eventInfo->getMask()->value;
 
                 $this->eventEmitter->emit($eventMask, [$eventInfo]);
             }
