@@ -9,7 +9,7 @@ use RecursiveIteratorIterator;
 use RTC\Watcher\Watching\EventInfo;
 use RTC\Watcher\Watching\EventTrait;
 use RTC\Watcher\Watching\WatchedItem;
-use Swoole\Event as SWEvent;
+use Swoole\Event as SwooleEvent;
 
 class Watcher
 {
@@ -58,6 +58,8 @@ class Watcher
     }
 
     /**
+     * Returns list of files currently being watched
+     *
      * @return WatchedItem[]
      */
     public function getWatchedItems(): array
@@ -74,11 +76,11 @@ class Watcher
     {
         // Register paths
         foreach ($this->paths as $path) {
-            $this->registerInotifyEvent($path);
+            $this->recursivelyRegisterInotifyEvent($path);
         }
 
         // Set up a new event listener for inotify read events
-        SWEvent::add($this->getInotifyFD(), function () {
+        SwooleEvent::add($this->getInotifyFD(), function () {
             $inotifyEvents = inotify_read($this->getInotifyFD());
 
             // IF WE ARE LISTENING TO 'ON_ALL_EVENTS'
@@ -86,9 +88,7 @@ class Watcher
                 foreach ($inotifyEvents as $inotifyEvent) {
                     $this->inotifyPerformAdditionalOperations($inotifyEvent);
 
-                    if ('' != $inotifyEvent['name']) {   // Filter out invalid events
-                        $this->fireEvent($inotifyEvent);
-                    }
+                    $this->fireEvent($inotifyEvent);
                 }
 
                 return;
@@ -99,7 +99,7 @@ class Watcher
                 $this->inotifyPerformAdditionalOperations($inotifyEvent);
 
                 // Make sure that we support this event
-                if ('' != $inotifyEvent['name'] && $inotifyEvent['mask'] == $this->event->value) {
+                if ($inotifyEvent['mask'] == $this->event->value) {
                     $this->fireEvent($inotifyEvent);
                 }
             }
@@ -107,7 +107,7 @@ class Watcher
         });
 
         // Set to monitor and listen for read events for the given $fd
-        SWEvent::set(
+        SwooleEvent::set(
             $this->getInotifyFD(),
             null,
             null,
@@ -128,7 +128,7 @@ class Watcher
             $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
             // Register this path also if it's directory
             if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->registerInotifyEvent($eventInfo->getWatchedItem()->getFullPath());
+                $this->recursivelyRegisterInotifyEvent($eventInfo->getWatchedItem()->getFullPath());
             }
 
             return;
@@ -144,7 +144,14 @@ class Watcher
         }
     }
 
-    private function registerInotifyEvent(string $path): void
+    /**
+     * Register directory/file to inotify watcher
+     * Loops through directory recursively and register all it's subdirectories as well
+     *
+     * @param string $path
+     * @return void
+     */
+    private function recursivelyRegisterInotifyEvent(string $path): void
     {
         if (is_dir($path)) {
             $iterator = new RecursiveDirectoryIterator($path);
@@ -152,21 +159,43 @@ class Watcher
             // Loop through files
             foreach (new RecursiveIteratorIterator($iterator) as $file) {
                 if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
-                    $descriptor = inotify_add_watch(
-                        $this->getInotifyFD(),
-                        $file->getRealPath(),
-                        Event::ON_ALL_EVENTS->value
-                    );
-
-                    $this->watchedItems[$descriptor] = [
-                        'path' => $file->getRealPath(),
-                        'mask' => $this->event->value,
-                    ];
+                    $this->registerInotifyEvent($file->getRealPath());
                 }
             }
+
+            return;
         }
+
+        // Register file watch
+        $this->registerInotifyEvent($path);
     }
 
+    /**
+     * Register directory/file to inotify watcher
+     *
+     * @param string $path
+     * @return void
+     */
+    private function registerInotifyEvent(string $path): void
+    {
+        $descriptor = inotify_add_watch(
+            $this->getInotifyFD(),
+            $path,
+            Event::ON_ALL_EVENTS->value
+        );
+
+        $this->watchedItems[$descriptor] = [
+            'path' => $path,
+            'mask' => $this->event->value,
+        ];
+    }
+
+    /**
+     * Stop watching file/directory
+     *
+     * @param EventInfo $eventInfo
+     * @return void
+     */
     public function removeInotifyEvent(EventInfo $eventInfo)
     {
         // Stop watching event
@@ -176,6 +205,12 @@ class Watcher
         unset($this->watchedItems[$eventInfo->getWatchDescriptor()]);
     }
 
+    /**
+     * Trigger an event
+     *
+     * @param array $inotifyEvent
+     * @return void
+     */
     private function fireEvent(array $inotifyEvent): void
     {
         $shouldFireEvent = array_key_exists($inotifyEvent['mask'], self::$constants);
