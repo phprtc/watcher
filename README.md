@@ -1,6 +1,6 @@
-# RTC\Watcher
+# File Watcher
 
-[Swoole](https://swoole.co.uk) file system changes watcher.
+PHP-based file system changes watcher implemented using [**Swoole**](https://swoole.co.uk) & **Inotify**.
 
 ## Installation
 
@@ -20,11 +20,59 @@ require 'vendor/autoload.php';
 Watcher::create()
     ->addPath(__DIR__ . '/app')
     ->addPath(__DIR__ . '/views')
-    //->fileShouldNotEndWith(['.php'])
-    ->onAny(function (EventInfo $eventInfo) {
-        dump($eventInfo->getMask());
+    ->onChange(function (EventInfo $eventInfo) {
+        var_dump($eventInfo->getMask());
     });
 ```
+
+#### Filter
+- Make sure that the file whose event is being fired should not end with provided characters.
+    ```php
+    use RTC\Watcher\Watcher;
+    
+    require 'vendor/autoload.php';
+    
+    Watcher::create()
+        ->addPath(__DIR__ . '/app')
+        ->fileShouldNotEndWith(['.php'])
+        ->onChange(function (EventInfo $eventInfo) {
+            var_dump($eventInfo->getMask());
+        });
+    ```
+
+- Only listen to event with file name that matches given extension(s).
+    ```php
+    use RTC\Watcher\Watcher;
+    
+    require 'vendor/autoload.php';
+    
+    Watcher::create()
+        ->addPath(__DIR__ . '/app')
+        ->addExtension('php')
+        ->onChange(function (EventInfo $eventInfo) {
+            var_dump($eventInfo->getMask());
+        });
+    ```
+
+
+#### Any-event
+Listens to any event on given path
+
+Be careful using this method.
+
+```php
+use RTC\Watcher\Watcher;
+
+require 'vendor/autoload.php';
+
+Watcher::create()
+    ->addPath(__DIR__ . '/app')
+    ->onAny(function (EventInfo $eventInfo) {
+        var_dump($eventInfo->getMask());
+    });
+```
+
+
 
 #### Swoole Server Integration
 
