@@ -21,11 +21,12 @@ Watcher::create()
     ->addPath(__DIR__ . '/app')
     ->addPath(__DIR__ . '/views')
     ->onChange(function (EventInfo $eventInfo) {
-        var_dump($eventInfo->getWatchedItem()->getFullPath());
+        echo $eventInfo->getWatchedItem()->getFullPath() . PHP_EOL;
     });
 ```
 
 #### Filter
+
 - Make sure that the file whose event is being fired should not end with provided characters.
     ```php
     use RTC\Watcher\Watcher;
@@ -36,7 +37,7 @@ Watcher::create()
         ->addPath(__DIR__ . '/app')
         ->fileShouldNotEndWith(['.php'])
         ->onChange(function (EventInfo $eventInfo) {
-            var_dump($eventInfo->getWatchedItem()->getFullPath());
+            echo $eventInfo->getWatchedItem()->getFullPath() . PHP_EOL;
         });
     ```
 
@@ -50,12 +51,12 @@ Watcher::create()
         ->addPath(__DIR__ . '/app')
         ->addExtension('php')
         ->onChange(function (EventInfo $eventInfo) {
-            var_dump($eventInfo->getWatchedItem()->getFullPath());
+            echo $eventInfo->getWatchedItem()->getFullPath() . PHP_EOL;
         });
     ```
 
-
 #### Any-event
+
 Listens to any event on given path
 
 Be careful using this method.
@@ -68,11 +69,9 @@ require 'vendor/autoload.php';
 Watcher::create()
     ->addPath(__DIR__ . '/app')
     ->onAny(function (EventInfo $eventInfo) {
-        var_dump($eventInfo->getWatchedItem()->getFullPath());
+        echo date('H:i:s') . " - {$eventInfo->getName()} {$eventInfo->getWatchedItem()->getFullPath()}\n";
     });
 ```
-
-
 
 #### Swoole Server Integration
 
