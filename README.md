@@ -21,7 +21,7 @@ Watcher::create()
     ->addPath(__DIR__ . '/app')
     ->addPath(__DIR__ . '/views')
     ->onChange(function (EventInfo $eventInfo) {
-        var_dump($eventInfo->getMask());
+        var_dump($eventInfo->getWatchedItem()->getFullPath());
     });
 ```
 
@@ -36,7 +36,7 @@ Watcher::create()
         ->addPath(__DIR__ . '/app')
         ->fileShouldNotEndWith(['.php'])
         ->onChange(function (EventInfo $eventInfo) {
-            var_dump($eventInfo->getMask());
+            var_dump($eventInfo->getWatchedItem()->getFullPath());
         });
     ```
 
@@ -50,7 +50,7 @@ Watcher::create()
         ->addPath(__DIR__ . '/app')
         ->addExtension('php')
         ->onChange(function (EventInfo $eventInfo) {
-            var_dump($eventInfo->getMask());
+            var_dump($eventInfo->getWatchedItem()->getFullPath());
         });
     ```
 
@@ -68,7 +68,7 @@ require 'vendor/autoload.php';
 Watcher::create()
     ->addPath(__DIR__ . '/app')
     ->onAny(function (EventInfo $eventInfo) {
-        var_dump($eventInfo->getMask());
+        var_dump($eventInfo->getWatchedItem()->getFullPath());
     });
 ```
 
