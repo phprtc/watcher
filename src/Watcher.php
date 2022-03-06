@@ -48,13 +48,146 @@ class Watcher
      *
      * @return mixed
      */
-    public function getInotifyFD(): mixed
+    protected function getInotifyFD(): mixed
     {
         if (!isset($this->inotifyFD)) {
             $this->inotifyFD = inotify_init();
         }
 
         return $this->inotifyFD;
+    }
+
+    /**
+     * Handles directory creation/deletion on the fly
+     *
+     * @param array $inotifyEvent
+     * @return void
+     */
+    protected function inotifyPerformAdditionalOperations(array $inotifyEvent): void
+    {
+        // Handle directory creation
+        if ($inotifyEvent['mask'] == $this->maskItemCreated) {
+            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+            // Register this path also if it's directory
+            if ($eventInfo->getWatchedItem()->isDir()) {
+                $this->recursivelyRegisterInotifyEvent($eventInfo->getWatchedItem()->getFullPath());
+            }
+
+            return;
+        }
+
+        // Handle directory deletion
+        if ($inotifyEvent['mask'] == $this->maskItemDeleted) {
+            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+            // Remove this path also if it's directory
+            if ($eventInfo->getWatchedItem()->isDir()) {
+                $this->removeInotifyEvent($eventInfo);
+            }
+        }
+    }
+
+    /**
+     * Register directory/file to inotify watcher
+     * Loops through directory recursively and register all it's subdirectories as well
+     *
+     * @param string $path
+     * @return void
+     */
+    protected function recursivelyRegisterInotifyEvent(string $path): void
+    {
+        if (is_dir($path)) {
+            $iterator = new RecursiveDirectoryIterator($path);
+
+            // Loop through files
+            foreach (new RecursiveIteratorIterator($iterator) as $file) {
+                if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
+                    $this->registerInotifyEvent($file->getRealPath());
+                }
+            }
+
+            return;
+        }
+
+        // Register file watch
+        $this->registerInotifyEvent($path);
+    }
+
+    /**
+     * Register directory/file to inotify watcher
+     *
+     * @param string $path
+     * @return void
+     */
+    protected function registerInotifyEvent(string $path): void
+    {
+        $descriptor = inotify_add_watch(
+            $this->getInotifyFD(),
+            $path,
+            Event::ON_ALL_EVENTS->value
+        );
+
+        $this->watchedItems[$descriptor] = [
+            'path' => $path,
+            'mask' => $this->event->value,
+        ];
+    }
+
+    /**
+     * Stop watching file/directory
+     *
+     * @param EventInfo $eventInfo
+     * @return void
+     */
+    protected function removeInotifyEvent(EventInfo $eventInfo)
+    {
+        // Stop watching event
+        inotify_rm_watch($this->getInotifyFD(), $eventInfo->getWatchDescriptor());
+
+        // Stop tracking descriptor
+        unset($this->watchedItems[$eventInfo->getWatchDescriptor()]);
+    }
+
+    /**
+     * Trigger an event
+     *
+     * @param array $inotifyEvent
+     * @return void
+     */
+    protected function fireEvent(array $inotifyEvent): void
+    {
+        $shouldFireEvent = array_key_exists($inotifyEvent['mask'], self::$constants);
+
+        if ($shouldFireEvent) {
+            // Make sure that the inotify fired event file name does not contain unneeded chars
+            foreach ($this->fileShouldNotEndWith as $char) {
+                if (str_ends_with($inotifyEvent['name'], $char)) {
+                    $shouldFireEvent = false;
+                    break;
+                }
+            }
+
+            // Make sure that the event has registered items
+            if ($this->willWatchAny && $shouldFireEvent) {
+                $shouldFireEvent = array_key_exists($inotifyEvent['wd'], $this->watchedItems);
+            }
+
+            // Handle extension condition
+            if ($shouldFireEvent && !empty($this->extensions)) {
+                $expExt = explode('.', $inotifyEvent['name']);
+                $shouldFireEvent = in_array(end($expExt), $this->extensions);
+            }
+
+            // Fire event if conditions are met
+            if ($shouldFireEvent) {
+                $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+
+                $eventMask = $this->willWatchAny
+                    ? Event::ON_ALL_EVENTS->value
+                    : $eventInfo->getMask()->value;
+
+                $this->eventEmitter->emit($eventMask, [$eventInfo]);
+            }
+        }
     }
 
     /**
@@ -113,139 +246,6 @@ class Watcher
             null,
             SWOOLE_EVENT_READ
         );
-    }
-
-    /**
-     * Handles directory creation/deletion on the fly
-     *
-     * @param array $inotifyEvent
-     * @return void
-     */
-    private function inotifyPerformAdditionalOperations(array $inotifyEvent): void
-    {
-        // Handle directory creation
-        if ($inotifyEvent['mask'] == $this->maskItemCreated) {
-            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
-            // Register this path also if it's directory
-            if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->recursivelyRegisterInotifyEvent($eventInfo->getWatchedItem()->getFullPath());
-            }
-
-            return;
-        }
-
-        // Handle directory deletion
-        if ($inotifyEvent['mask'] == $this->maskItemDeleted) {
-            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
-            // Remove this path also if it's directory
-            if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->removeInotifyEvent($eventInfo);
-            }
-        }
-    }
-
-    /**
-     * Register directory/file to inotify watcher
-     * Loops through directory recursively and register all it's subdirectories as well
-     *
-     * @param string $path
-     * @return void
-     */
-    private function recursivelyRegisterInotifyEvent(string $path): void
-    {
-        if (is_dir($path)) {
-            $iterator = new RecursiveDirectoryIterator($path);
-
-            // Loop through files
-            foreach (new RecursiveIteratorIterator($iterator) as $file) {
-                if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
-                    $this->registerInotifyEvent($file->getRealPath());
-                }
-            }
-
-            return;
-        }
-
-        // Register file watch
-        $this->registerInotifyEvent($path);
-    }
-
-    /**
-     * Register directory/file to inotify watcher
-     *
-     * @param string $path
-     * @return void
-     */
-    private function registerInotifyEvent(string $path): void
-    {
-        $descriptor = inotify_add_watch(
-            $this->getInotifyFD(),
-            $path,
-            Event::ON_ALL_EVENTS->value
-        );
-
-        $this->watchedItems[$descriptor] = [
-            'path' => $path,
-            'mask' => $this->event->value,
-        ];
-    }
-
-    /**
-     * Stop watching file/directory
-     *
-     * @param EventInfo $eventInfo
-     * @return void
-     */
-    public function removeInotifyEvent(EventInfo $eventInfo)
-    {
-        // Stop watching event
-        inotify_rm_watch($this->getInotifyFD(), $eventInfo->getWatchDescriptor());
-
-        // Stop tracking descriptor
-        unset($this->watchedItems[$eventInfo->getWatchDescriptor()]);
-    }
-
-    /**
-     * Trigger an event
-     *
-     * @param array $inotifyEvent
-     * @return void
-     */
-    private function fireEvent(array $inotifyEvent): void
-    {
-        $shouldFireEvent = array_key_exists($inotifyEvent['mask'], self::$constants);
-
-        if ($shouldFireEvent) {
-            // Make sure that the inotify fired event file name does not contain unneeded chars
-            foreach ($this->fileShouldNotEndWith as $char) {
-                if (str_ends_with($inotifyEvent['name'], $char)) {
-                    $shouldFireEvent = false;
-                    break;
-                }
-            }
-
-            // Make sure that the event has registered items
-            if ($this->willWatchAny && $shouldFireEvent) {
-                $shouldFireEvent = array_key_exists($inotifyEvent['wd'], $this->watchedItems);
-            }
-
-            // Handle extension condition
-            if ($shouldFireEvent && !empty($this->extensions)) {
-                $expExt = explode('.', $inotifyEvent['name']);
-                $shouldFireEvent = in_array(end($expExt), $this->extensions);
-            }
-
-            // Fire event if conditions are met
-            if ($shouldFireEvent) {
-                $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
-
-                $eventMask = $this->willWatchAny
-                    ? Event::ON_ALL_EVENTS->value
-                    : $eventInfo->getMask()->value;
-
-                $this->eventEmitter->emit($eventMask, [$eventInfo]);
-            }
-        }
     }
 
     /**
