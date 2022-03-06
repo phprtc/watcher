@@ -5,7 +5,7 @@ PHP-based file system changes watcher implemented using [**Swoole**](https://swo
 ## Installation
 
 ```
-composer require phprtc/watcher
+composer require phprtc/watcher ^0.0 --dev
 ```
 
 ## Usage
