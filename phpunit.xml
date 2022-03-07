@@ -9,7 +9,7 @@
          processIsolation="false"
 >
     <testsuites>
-        <testsuite name="QuickRoute Tests">
+        <testsuite name="PHP RTC Watcher Tests">
             <directory>./tests</directory>
         </testsuite>
     </testsuites>

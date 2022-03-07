@@ -70,7 +70,7 @@ class Watcher
             $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
             // Register this path also if it's directory
             if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->recursivelyRegisterInotifyEvent($eventInfo->getWatchedItem()->getFullPath());
+                $this->inotifyWatchPathRecursively($eventInfo->getWatchedItem()->getFullPath());
             }
 
             return;
@@ -81,7 +81,7 @@ class Watcher
             $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
             // Remove this path also if it's directory
             if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->removeInotifyEvent($eventInfo);
+                $this->inotifyRemovePathWatch($eventInfo);
             }
         }
     }
@@ -93,7 +93,7 @@ class Watcher
      * @param string $path
      * @return void
      */
-    protected function recursivelyRegisterInotifyEvent(string $path): void
+    protected function inotifyWatchPathRecursively(string $path): void
     {
         if (is_dir($path)) {
             $iterator = new RecursiveDirectoryIterator($path);
@@ -101,7 +101,7 @@ class Watcher
             // Loop through files
             foreach (new RecursiveIteratorIterator($iterator) as $file) {
                 if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
-                    $this->registerInotifyEvent($file->getRealPath());
+                    $this->inotifyWatchPath($file->getRealPath());
                 }
             }
 
@@ -109,7 +109,7 @@ class Watcher
         }
 
         // Register file watch
-        $this->registerInotifyEvent($path);
+        $this->inotifyWatchPath($path);
     }
 
     /**
@@ -118,7 +118,7 @@ class Watcher
      * @param string $path
      * @return void
      */
-    protected function registerInotifyEvent(string $path): void
+    protected function inotifyWatchPath(string $path): void
     {
         $descriptor = inotify_add_watch(
             $this->getInotifyFD(),
@@ -138,7 +138,7 @@ class Watcher
      * @param EventInfo $eventInfo
      * @return void
      */
-    protected function removeInotifyEvent(EventInfo $eventInfo)
+    protected function inotifyRemovePathWatch(EventInfo $eventInfo)
     {
         // Stop watching event
         inotify_rm_watch($this->getInotifyFD(), $eventInfo->getWatchDescriptor());
@@ -209,7 +209,7 @@ class Watcher
     {
         // Register paths
         foreach ($this->paths as $path) {
-            $this->recursivelyRegisterInotifyEvent($path);
+            $this->inotifyWatchPathRecursively($path);
         }
 
         // Set up a new event listener for inotify read events
