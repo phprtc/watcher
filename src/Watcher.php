@@ -20,6 +20,7 @@ class Watcher
     protected mixed $inotifyFD;
     protected array $paths = [];
     protected array $extensions = [];
+    protected array $ignorePaths = [];
     protected array $watchedItems = [];
 
     protected readonly int $maskItemCreated;
@@ -181,6 +182,12 @@ class Watcher
             if ($shouldFireEvent) {
                 $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
 
+                foreach ($this->ignorePaths as $ignorePath) {
+                    if (1 === preg_match("@$ignorePath@", $eventInfo->getWatchedItem()->getFullPath())) {
+                        return;
+                    }
+                }
+
                 $eventMask = $this->willWatchAny
                     ? Event::ON_ALL_EVENTS->value
                     : $eventInfo->getMask()->value;
@@ -285,6 +292,23 @@ class Watcher
             ? $this->fileShouldNotEndWith = $characters
             : $this->fileShouldNotEndWith = array_merge($this->fileShouldNotEndWith, $characters);
 
+        return $this;
+    }
+
+    /**
+     * Ignore event from being fired if path matches given ones
+     *
+     * @param array|string $path
+     * @return $this
+     */
+    public function ignore(array|string $path): Watcher
+    {
+        if (is_string($path)) {
+            $this->ignorePaths[] = $path;
+            return $this;
+        }
+
+        $this->ignorePaths = array_merge($this->ignorePaths, $path);
         return $this;
     }
 }
