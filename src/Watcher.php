@@ -9,6 +9,7 @@ use RecursiveIteratorIterator;
 use RTC\Watcher\Watching\EventInfo;
 use RTC\Watcher\Watching\EventTrait;
 use RTC\Watcher\Watching\WatchedItem;
+use RuntimeException;
 use Swoole\Event as SwooleEvent;
 
 class Watcher
@@ -214,6 +215,10 @@ class Watcher
      */
     public function watch(): void
     {
+        if (!class_exists(SwooleEvent::class)) {
+            throw new RuntimeException('Please verify your Swoole installation');
+        }
+
         // Register paths
         foreach ($this->paths as $path) {
             $this->inotifyWatchPathRecursively($path);
