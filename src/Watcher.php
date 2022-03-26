@@ -127,10 +127,7 @@ class Watcher
             Event::ON_ALL_EVENTS->value
         );
 
-        $this->watchedItems[$descriptor] = [
-            'path' => $path,
-            'mask' => $this->event->value,
-        ];
+        $this->watchedItems[$descriptor] = $path;
     }
 
     /**
@@ -226,9 +223,9 @@ class Watcher
             // IF WE ARE LISTENING TO 'ON_ALL_EVENTS'
             if ($this->willWatchAny) {
                 foreach ($inotifyEvents as $inotifyEvent) {
-                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
-
                     $this->fireEvent($inotifyEvent);
+
+                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
                 }
 
                 return;
@@ -236,12 +233,12 @@ class Watcher
 
             // INDIVIDUAL LISTENERS
             foreach ($inotifyEvents as $inotifyEvent) {
-                $this->inotifyPerformAdditionalOperations($inotifyEvent);
-
                 // Make sure that we support this event
-                if ($inotifyEvent['mask'] == $this->event->value) {
+                if (in_array($inotifyEvent['mask'], $this->watchedMasks)) {
                     $this->fireEvent($inotifyEvent);
                 }
+
+                $this->inotifyPerformAdditionalOperations($inotifyEvent);
             }
 
         });

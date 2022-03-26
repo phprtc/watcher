@@ -15,10 +15,10 @@ class EventInfo
 
     public function __construct(
         protected array $event,
-        array $pathData
+        string $path
     )
     {
-        $this->watchedItem = new WatchedItem($pathData['path'], $this);
+        $this->watchedItem = new WatchedItem($path, $this);
         $this->eventMask = $this->event['mask'];
         $this->eventInfo = Watcher::$constants[$event['mask']];
     }
