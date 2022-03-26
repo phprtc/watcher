@@ -76,9 +76,9 @@ trait EventTrait
     /**
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return void
+     * @return EventTrait
      */
-    public function onAny(callable $listener, bool $fireOnce = false): void
+    public function onAny(callable $listener, bool $fireOnce = false): static
     {
         $this->willWatchAny = true;
 
@@ -86,7 +86,7 @@ trait EventTrait
             ? $this->once(Event::ON_ALL_EVENTS, $listener)
             : $this->on(Event::ON_ALL_EVENTS, $listener);
 
-        $this->watch();
+        return $this;
     }
 
     /**
@@ -94,9 +94,9 @@ trait EventTrait
      *
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return void
+     * @return EventTrait
      */
-    public function onChange(callable $listener, bool $fireOnce = false): void
+    public function onChange(callable $listener, bool $fireOnce = false): static
     {
         $this->watchedMasks[] = Event::ON_CLOSE_WRITE->value;
 
@@ -104,6 +104,6 @@ trait EventTrait
             ? $this->once(Event::ON_CLOSE_WRITE, $listener)
             : $this->on(Event::ON_CLOSE_WRITE, $listener);
 
-        $this->watch();
+        return $this;
     }
 }
