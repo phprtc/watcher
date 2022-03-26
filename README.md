@@ -22,7 +22,8 @@ Watcher::create()
     ->addPath(__DIR__ . '/views')
     ->onChange(function (EventInfo $eventInfo) {
         echo $eventInfo->getWatchedItem()->getFullPath() . PHP_EOL;
-    });
+    })
+    ->watch();
 ```
 
 #### Any Event
@@ -40,7 +41,8 @@ Watcher::create()
     ->addPath(__DIR__ . '/app')
     ->onAny(function (EventInfo $eventInfo) {
         echo date('H:i:s') . " - {$eventInfo->getName()} {$eventInfo->getWatchedItem()->getFullPath()}\n";
-    });
+    })
+    ->watch();
 ```
 
 #### Ignoring Path
@@ -61,7 +63,8 @@ Watcher::create()
     ])   
     ->onChange(function (EventInfo $eventInfo) {
         echo date('H:i:s') . " - {$eventInfo->getName()} {$eventInfo->getWatchedItem()->getFullPath()}\n";
-    });
+    })
+    ->watch();
 ```
 
 #### Filter
@@ -77,7 +80,8 @@ Watcher::create()
         ->fileShouldNotEndWith(['.php'])
         ->onChange(function (EventInfo $eventInfo) {
             echo $eventInfo->getWatchedItem()->getFullPath() . PHP_EOL;
-        });
+        })
+        ->watch();
     ```
 
 - Only listen to event with file name that matches given extension(s).
@@ -91,7 +95,8 @@ Watcher::create()
         ->addExtension('php')
         ->onChange(function (EventInfo $eventInfo) {
             echo $eventInfo->getWatchedItem()->getFullPath() . PHP_EOL;
-        });
+        })
+        ->watch();
     ```
 
 #### Swoole Server Integration
@@ -115,7 +120,8 @@ $server->on('start', function (Server $server) {
     Watcher::create()
         ->addPath(__DIR__ . '/app')
         ->addPath(__DIR__ . '/views')
-        ->onChange(fn() => $server->reload());
+        ->onChange(fn() => $server->reload())
+        ->watch();
 });
 
 $server->start();
