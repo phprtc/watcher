@@ -236,9 +236,9 @@ class Watcher
                 // Make sure that we support this event
                 if (in_array($inotifyEvent['mask'], $this->watchedMasks)) {
                     $this->fireEvent($inotifyEvent);
-                }
 
-                $this->inotifyPerformAdditionalOperations($inotifyEvent);
+                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
+                }
             }
 
         });
