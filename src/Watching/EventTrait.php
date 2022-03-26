@@ -80,13 +80,11 @@ trait EventTrait
      */
     public function onAny(callable $listener, bool $fireOnce = false): static
     {
-        $this->willWatchAny = true;
-
-        $fireOnce
-            ? $this->once(Event::ON_ALL_EVENTS, $listener)
-            : $this->on(Event::ON_ALL_EVENTS, $listener);
-
-        return $this;
+        return $this->listenToHelperEvent(
+            Event::ON_ALL_EVENTS,
+            $listener,
+            $fireOnce
+        );
     }
 
     /**
@@ -98,11 +96,86 @@ trait EventTrait
      */
     public function onChange(callable $listener, bool $fireOnce = false): static
     {
-        $this->watchedMasks[] = Event::ON_CLOSE_WRITE->value;
+        return $this->listenToHelperEvent(
+            Event::ON_CLOSE_WRITE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    /**
+     * Listen to create event on provided paths
+     *
+     * @param callable $listener
+     * @param bool $fireOnce Indicates that this event should only be listened once
+     * @return EventTrait
+     */
+    public function onCreate(callable $listener, bool $fireOnce = false): static
+    {
+        // Directory Creation
+        $this->listenToHelperEvent(
+            Event::ON_CREATE_HIGH,
+            $listener,
+            $fireOnce
+        );
+
+        // File Creation
+        return $this->listenToHelperEvent(
+            Event::ON_CREATE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    /**
+     * Listen to move event on provided paths
+     *
+     * @param callable $listener
+     * @param bool $fireOnce Indicates that this event should only be listened once
+     * @return EventTrait
+     */
+    public function onMove(callable $listener, bool $fireOnce = false): static
+    {
+        return $this->listenToHelperEvent(
+            Event::ON_MOVE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    /**
+     * Listen to delete on provided paths
+     *
+     * @param callable $listener
+     * @param bool $fireOnce Indicates that this event should only be listened once
+     * @return EventTrait
+     */
+    public function onDelete(callable $listener, bool $fireOnce = false): static
+    {
+        // Delete Directory
+        $this->listenToHelperEvent(
+            Event::ON_DELETE_HIGH,
+            $listener,
+            $fireOnce
+        );
+
+        // Delete File
+        return $this->listenToHelperEvent(
+            Event::ON_DELETE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    protected function listenToHelperEvent(Event $event, callable $listener, bool $fireOnce = false): static
+    {
+        if ($event !== Event::ON_ALL_EVENTS) {
+            $this->watchedMasks[] = $event->value;
+        }
 
         $fireOnce
-            ? $this->once(Event::ON_CLOSE_WRITE, $listener)
-            : $this->on(Event::ON_CLOSE_WRITE, $listener);
+            ? $this->once($event, $listener)
+            : $this->on($event, $listener);
 
         return $this;
     }
