@@ -10,9 +10,9 @@ use RTC\Watcher\Event;
 
 trait EventTrait
 {
-    protected Event $event;
     protected EventEmitter $eventEmitter;
     protected bool $willWatchAny = false;
+    protected array $watchedMasks = [];
     public static array $constants = [
         0 => ['UNKNOWN', 'Unknown code.'],
         1 => ['ON_ACCESS', 'File was accessed (read)'],
@@ -56,20 +56,20 @@ trait EventTrait
             $this->willWatchAny = true;
         }
 
+        $this->watchedMasks[] = $event->value;
         $this->eventEmitter->on($event->value, $handler);
         return $this;
     }
 
     public function once(Event $event, callable $handler): static
     {
-        $this->event = $event;
+        $this->watchedMasks[] = $event->value;
         $this->eventEmitter->once($event->value, $handler);
         return $this;
     }
 
     protected function emit(Event $event, array $data): void
     {
-        $this->event = $event;
         $this->eventEmitter->emit($event->value, $data);
     }
 
@@ -80,7 +80,6 @@ trait EventTrait
      */
     public function onAny(callable $listener, bool $fireOnce = false): void
     {
-        $this->event = Event::ON_ALL_EVENTS;
         $this->willWatchAny = true;
 
         $fireOnce
@@ -99,7 +98,7 @@ trait EventTrait
      */
     public function onChange(callable $listener, bool $fireOnce = false): void
     {
-        $this->event = Event::ON_CLOSE_WRITE;
+        $this->watchedMasks[] = Event::ON_CLOSE_WRITE->value;
 
         $fireOnce
             ? $this->once(Event::ON_CLOSE_WRITE, $listener)
