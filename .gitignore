@@ -6,3 +6,5 @@
 /.test2
 /.test.php
 .phpunit.result.cache
+
+/tests/bait
