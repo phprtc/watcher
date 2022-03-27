@@ -76,7 +76,7 @@ trait EventTrait
     /**
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return EventTrait
+     * @return static
      */
     public function onAny(callable $listener, bool $fireOnce = false): static
     {
@@ -92,7 +92,7 @@ trait EventTrait
      *
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return EventTrait
+     * @return static
      */
     public function onChange(callable $listener, bool $fireOnce = false): static
     {
@@ -108,7 +108,7 @@ trait EventTrait
      *
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return EventTrait
+     * @return static
      */
     public function onCreate(callable $listener, bool $fireOnce = false): static
     {
@@ -132,7 +132,7 @@ trait EventTrait
      *
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return EventTrait
+     * @return static
      */
     public function onMove(callable $listener, bool $fireOnce = false): static
     {
@@ -148,7 +148,7 @@ trait EventTrait
      *
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return EventTrait
+     * @return static
      */
     public function onDelete(callable $listener, bool $fireOnce = false): static
     {

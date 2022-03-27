@@ -67,8 +67,9 @@ class Watcher
     protected function inotifyPerformAdditionalOperations(array $inotifyEvent): void
     {
         // Handle directory creation
+        $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+
         if ($inotifyEvent['mask'] == $this->maskItemCreated) {
-            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
             // Register this path also if it's directory
             if ($eventInfo->getWatchedItem()->isDir()) {
                 $this->inotifyWatchPathRecursively($eventInfo->getWatchedItem()->getFullPath());
@@ -77,13 +78,9 @@ class Watcher
             return;
         }
 
-        // Handle directory deletion
-        if ($inotifyEvent['mask'] == $this->maskItemDeleted) {
-            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
-            // Remove this path also if it's directory
-            if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->inotifyRemovePathWatch($eventInfo);
-            }
+        // Handle file/directory deletion
+        if ($eventInfo->getWatchedItem()->isDir()) {
+            $this->inotifyRemovePathWatch($eventInfo);
         }
     }
 
@@ -101,7 +98,7 @@ class Watcher
 
             // Loop through files
             foreach (new RecursiveIteratorIterator($iterator) as $file) {
-                if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
+                if ($file->isDir() && !in_array($file->getRealPath(), $this->watchedItems)) {
                     $this->inotifyWatchPath($file->getRealPath());
                 }
             }
@@ -136,13 +133,18 @@ class Watcher
      * @param EventInfo $eventInfo
      * @return void
      */
-    protected function inotifyRemovePathWatch(EventInfo $eventInfo)
+    protected function inotifyRemovePathWatch(EventInfo $eventInfo): void
     {
+        $descriptor = $eventInfo->getWatchDescriptor();
+        if ($eventInfo->getWatchedItem()->getFullPath() != $this->watchedItems[$descriptor]){
+            return;
+        }
+
         // Stop watching event
-        inotify_rm_watch($this->getInotifyFD(), $eventInfo->getWatchDescriptor());
+        @inotify_rm_watch($this->getInotifyFD(), $descriptor);
 
         // Stop tracking descriptor
-        unset($this->watchedItems[$eventInfo->getWatchDescriptor()]);
+        unset($this->watchedItems[$descriptor]);
     }
 
     /**
@@ -159,13 +161,12 @@ class Watcher
             // Make sure that the inotify fired event file name does not contain unneeded chars
             foreach ($this->fileShouldNotEndWith as $char) {
                 if (str_ends_with($inotifyEvent['name'], $char)) {
-                    $shouldFireEvent = false;
-                    break;
+                    return;
                 }
             }
 
             // Make sure that the event has registered items
-            if ($this->willWatchAny && $shouldFireEvent) {
+            if ($this->willWatchAny) {
                 $shouldFireEvent = array_key_exists($inotifyEvent['wd'], $this->watchedItems);
             }
 
@@ -233,6 +234,7 @@ class Watcher
 
             // INDIVIDUAL LISTENERS
             foreach ($inotifyEvents as $inotifyEvent) {
+               // var_export($inotifyEvent);
                 // Make sure that we support this event
                 if (in_array($inotifyEvent['mask'], $this->watchedMasks)) {
                     $this->fireEvent($inotifyEvent);
