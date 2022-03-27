@@ -69,10 +69,6 @@ class WatcherTest extends TestCase
                     static $calls = 0;
                     $calls += 1;
 
-                    if (BAIT_DIR == $eventInfo->getWatchedItem()->getFullPath()) {
-                        return;
-                    }
-
                     if ($calls == 1) {
                         self::assertSame($fileToDelete, $eventInfo->getWatchedItem()->getFullPath());
                     }
@@ -138,10 +134,6 @@ class WatcherTest extends TestCase
                 })
                 ->onDelete(function (EventInfo $eventInfo) use (&$watcher, $baitDir, $baitFile) {
                     static $calls = 0;
-
-                    if (BAIT_DIR == $eventInfo->getWatchedItem()->getFullPath()) {
-                        return;
-                    }
 
                     $calls += 1;
 

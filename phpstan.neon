@@ -1,6 +1,6 @@
 parameters:
     level: 8
-    paths: ['src', 'tests']
+    paths: ['src', 'tests/bootstrap.php', 'tests']
     checkMissingIterableValueType: false
     checkGenericClassInNonGenericObjectType: false
     ignoreErrors:
