@@ -10,9 +10,9 @@ use RTC\Watcher\Event;
 
 trait EventTrait
 {
-    protected Event $event;
     protected EventEmitter $eventEmitter;
     protected bool $willWatchAny = false;
+    protected array $watchedMasks = [];
     public static array $constants = [
         0 => ['UNKNOWN', 'Unknown code.'],
         1 => ['ON_ACCESS', 'File was accessed (read)'],
@@ -56,38 +56,35 @@ trait EventTrait
             $this->willWatchAny = true;
         }
 
+        $this->watchedMasks[] = $event->value;
         $this->eventEmitter->on($event->value, $handler);
         return $this;
     }
 
     public function once(Event $event, callable $handler): static
     {
-        $this->event = $event;
+        $this->watchedMasks[] = $event->value;
         $this->eventEmitter->once($event->value, $handler);
         return $this;
     }
 
     protected function emit(Event $event, array $data): void
     {
-        $this->event = $event;
         $this->eventEmitter->emit($event->value, $data);
     }
 
     /**
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return void
+     * @return static
      */
-    public function onAny(callable $listener, bool $fireOnce = false): void
+    public function onAny(callable $listener, bool $fireOnce = false): static
     {
-        $this->event = Event::ON_ALL_EVENTS;
-        $this->willWatchAny = true;
-
-        $fireOnce
-            ? $this->once(Event::ON_ALL_EVENTS, $listener)
-            : $this->on(Event::ON_ALL_EVENTS, $listener);
-
-        $this->watch();
+        return $this->listenToHelperEvent(
+            Event::ON_ALL_EVENTS,
+            $listener,
+            $fireOnce
+        );
     }
 
     /**
@@ -95,16 +92,91 @@ trait EventTrait
      *
      * @param callable $listener
      * @param bool $fireOnce Indicates that this event should only be listened once
-     * @return void
+     * @return static
      */
-    public function onChange(callable $listener, bool $fireOnce = false): void
+    public function onChange(callable $listener, bool $fireOnce = false): static
     {
-        $this->event = Event::ON_CLOSE_WRITE;
+        return $this->listenToHelperEvent(
+            Event::ON_CLOSE_WRITE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    /**
+     * Listen to create event on provided paths
+     *
+     * @param callable $listener
+     * @param bool $fireOnce Indicates that this event should only be listened once
+     * @return static
+     */
+    public function onCreate(callable $listener, bool $fireOnce = false): static
+    {
+        // Directory Creation
+        $this->listenToHelperEvent(
+            Event::ON_CREATE_HIGH,
+            $listener,
+            $fireOnce
+        );
+
+        // File Creation
+        return $this->listenToHelperEvent(
+            Event::ON_CREATE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    /**
+     * Listen to move event on provided paths
+     *
+     * @param callable $listener
+     * @param bool $fireOnce Indicates that this event should only be listened once
+     * @return static
+     */
+    public function onMove(callable $listener, bool $fireOnce = false): static
+    {
+        return $this->listenToHelperEvent(
+            Event::ON_MOVE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    /**
+     * Listen to delete on provided paths
+     *
+     * @param callable $listener
+     * @param bool $fireOnce Indicates that this event should only be listened once
+     * @return static
+     */
+    public function onDelete(callable $listener, bool $fireOnce = false): static
+    {
+        // Delete Directory
+        $this->listenToHelperEvent(
+            Event::ON_DELETE_HIGH,
+            $listener,
+            $fireOnce
+        );
+
+        // Delete File
+        return $this->listenToHelperEvent(
+            Event::ON_DELETE,
+            $listener,
+            $fireOnce
+        );
+    }
+
+    protected function listenToHelperEvent(Event $event, callable $listener, bool $fireOnce = false): static
+    {
+        if ($event !== Event::ON_ALL_EVENTS) {
+            $this->watchedMasks[] = $event->value;
+        }
 
         $fireOnce
-            ? $this->once(Event::ON_CLOSE_WRITE, $listener)
-            : $this->on(Event::ON_CLOSE_WRITE, $listener);
+            ? $this->once($event, $listener)
+            : $this->on($event, $listener);
 
-        $this->watch();
+        return $this;
     }
 }

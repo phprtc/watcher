@@ -20,6 +20,7 @@ class Watcher
     protected mixed $inotifyFD;
     protected array $paths = [];
     protected array $extensions = [];
+    protected array $ignorePaths = [];
     protected array $watchedItems = [];
 
     protected readonly int $maskItemCreated;
@@ -66,8 +67,9 @@ class Watcher
     protected function inotifyPerformAdditionalOperations(array $inotifyEvent): void
     {
         // Handle directory creation
+        $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+
         if ($inotifyEvent['mask'] == $this->maskItemCreated) {
-            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
             // Register this path also if it's directory
             if ($eventInfo->getWatchedItem()->isDir()) {
                 $this->inotifyWatchPathRecursively($eventInfo->getWatchedItem()->getFullPath());
@@ -76,13 +78,9 @@ class Watcher
             return;
         }
 
-        // Handle directory deletion
-        if ($inotifyEvent['mask'] == $this->maskItemDeleted) {
-            $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
-            // Remove this path also if it's directory
-            if ($eventInfo->getWatchedItem()->isDir()) {
-                $this->inotifyRemovePathWatch($eventInfo);
-            }
+        // Handle file/directory deletion
+        if ($eventInfo->getWatchedItem()->isDir()) {
+            $this->inotifyRemovePathWatch($eventInfo);
         }
     }
 
@@ -100,7 +98,7 @@ class Watcher
 
             // Loop through files
             foreach (new RecursiveIteratorIterator($iterator) as $file) {
-                if ($file->isDir()/**&& !in_array($file->getRealPath(), $this->watchedItems)**/) {
+                if ($file->isDir() && !in_array($file->getRealPath(), $this->watchedItems)) {
                     $this->inotifyWatchPath($file->getRealPath());
                 }
             }
@@ -126,10 +124,7 @@ class Watcher
             Event::ON_ALL_EVENTS->value
         );
 
-        $this->watchedItems[$descriptor] = [
-            'path' => $path,
-            'mask' => $this->event->value,
-        ];
+        $this->watchedItems[$descriptor] = $path;
     }
 
     /**
@@ -138,13 +133,18 @@ class Watcher
      * @param EventInfo $eventInfo
      * @return void
      */
-    protected function inotifyRemovePathWatch(EventInfo $eventInfo)
+    protected function inotifyRemovePathWatch(EventInfo $eventInfo): void
     {
+        $descriptor = $eventInfo->getWatchDescriptor();
+        if ($eventInfo->getWatchedItem()->getFullPath() != $this->watchedItems[$descriptor]){
+            return;
+        }
+
         // Stop watching event
-        inotify_rm_watch($this->getInotifyFD(), $eventInfo->getWatchDescriptor());
+        @inotify_rm_watch($this->getInotifyFD(), $descriptor);
 
         // Stop tracking descriptor
-        unset($this->watchedItems[$eventInfo->getWatchDescriptor()]);
+        unset($this->watchedItems[$descriptor]);
     }
 
     /**
@@ -161,13 +161,12 @@ class Watcher
             // Make sure that the inotify fired event file name does not contain unneeded chars
             foreach ($this->fileShouldNotEndWith as $char) {
                 if (str_ends_with($inotifyEvent['name'], $char)) {
-                    $shouldFireEvent = false;
-                    break;
+                    return;
                 }
             }
 
             // Make sure that the event has registered items
-            if ($this->willWatchAny && $shouldFireEvent) {
+            if ($this->willWatchAny) {
                 $shouldFireEvent = array_key_exists($inotifyEvent['wd'], $this->watchedItems);
             }
 
@@ -180,6 +179,12 @@ class Watcher
             // Fire event if conditions are met
             if ($shouldFireEvent) {
                 $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
+
+                foreach ($this->ignorePaths as $ignorePath) {
+                    if (1 === preg_match("@$ignorePath@", $eventInfo->getWatchedItem()->getFullPath())) {
+                        return;
+                    }
+                }
 
                 $eventMask = $this->willWatchAny
                     ? Event::ON_ALL_EVENTS->value
@@ -219,9 +224,9 @@ class Watcher
             // IF WE ARE LISTENING TO 'ON_ALL_EVENTS'
             if ($this->willWatchAny) {
                 foreach ($inotifyEvents as $inotifyEvent) {
-                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
-
                     $this->fireEvent($inotifyEvent);
+
+                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
                 }
 
                 return;
@@ -229,11 +234,12 @@ class Watcher
 
             // INDIVIDUAL LISTENERS
             foreach ($inotifyEvents as $inotifyEvent) {
-                $this->inotifyPerformAdditionalOperations($inotifyEvent);
-
+               // var_export($inotifyEvent);
                 // Make sure that we support this event
-                if ($inotifyEvent['mask'] == $this->event->value) {
+                if (in_array($inotifyEvent['mask'], $this->watchedMasks)) {
                     $this->fireEvent($inotifyEvent);
+
+                    $this->inotifyPerformAdditionalOperations($inotifyEvent);
                 }
             }
 
@@ -286,5 +292,50 @@ class Watcher
             : $this->fileShouldNotEndWith = array_merge($this->fileShouldNotEndWith, $characters);
 
         return $this;
+    }
+
+    /**
+     * Ignore event from being fired if path matches given ones
+     *
+     * @param array|string $path
+     * @return $this
+     */
+    public function ignore(array|string $path): Watcher
+    {
+        if (is_string($path)) {
+            $this->ignorePaths[] = $path;
+            return $this;
+        }
+
+        $this->ignorePaths = array_merge($this->ignorePaths, $path);
+        return $this;
+    }
+
+    /**
+     * Proxy of Watcher::watch()
+     *
+     * @return void
+     * @see Watcher::watch()
+     */
+    public function start(): void
+    {
+        $this->watch();
+    }
+
+    /**
+     * Stop watching
+     *
+     * @return void
+     */
+    public function stop(): void
+    {
+        if (isset($this->inotifyFD)) {
+            // Ask Swoole to remote watcher on this FD
+            SwooleEvent::del($this->inotifyFD);
+            // Close inotify FD resource
+            fclose($this->inotifyFD);
+            // Delete the var content
+            unset($this->inotifyFD);
+        }
     }
 }
