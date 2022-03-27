@@ -308,4 +308,30 @@ class Watcher
         $this->ignorePaths = array_merge($this->ignorePaths, $path);
         return $this;
     }
+
+    /**
+     * Proxy of Watcher::watch()
+     *
+     * @see Watcher::watch()
+     * @return void
+     */
+    public function start(): void
+    {
+        $this->watch();
+    }
+
+    /**
+     * Stop watching
+     *
+     * @return void
+     */
+    public function stop(): void
+    {
+        // Ask Swoole to remote watcher on this FD
+        SwooleEvent::del($this->inotifyFD);
+        // Close inotify FD resource
+        fclose($this->inotifyFD);
+        // Delete the var content
+        unset($this->inotifyFD);
+    }
 }

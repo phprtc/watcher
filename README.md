@@ -14,6 +14,7 @@ composer require phprtc/watcher ^0.0 --dev
 
 ```php
 use RTC\Watcher\Watcher;
+use RTC\Watcher\Watching\EventInfo;
 
 require 'vendor/autoload.php';
 
@@ -34,6 +35,7 @@ Be careful using this method.
 
 ```php
 use RTC\Watcher\Watcher;
+use RTC\Watcher\Watching\EventInfo;
 
 require 'vendor/autoload.php';
 
@@ -51,6 +53,7 @@ Ignore files using regular expression
 
 ```php
 use RTC\Watcher\Watcher;
+use RTC\Watcher\Watching\EventInfo;
 
 require 'vendor/autoload.php';
 
@@ -72,6 +75,7 @@ Watcher::create()
 - Make sure that the file whose event is being fired should not end with provided characters.
     ```php
     use RTC\Watcher\Watcher;
+    use RTC\Watcher\Watching\EventInfo;
     
     require 'vendor/autoload.php';
     
@@ -87,6 +91,7 @@ Watcher::create()
 - Only listen to event with file name that matches given extension(s).
     ```php
     use RTC\Watcher\Watcher;
+    use RTC\Watcher\Watching\EventInfo;
     
     require 'vendor/autoload.php';
     
@@ -98,6 +103,30 @@ Watcher::create()
         })
         ->watch();
     ```
+
+#### Stopping Watcher
+
+```php
+
+use RTC\Watcher\Watcher;
+use RTC\Watcher\Watching\EventInfo;
+use Swoole\Timer;
+
+require 'vendor/autoload.php';
+
+$watcher = Watcher::create()
+    ->addPath(__DIR__)
+    ->onCreate(function (EventInfo $eventInfo) {
+        echo date('H:i:s') . ": CREATED  - {$eventInfo->getWatchedItem()->getFullPath()}\n";
+    });
+
+Timer::after(1000, fn() => $watcher->stop());   // Stop watching after 1 second
+
+$watcher->start();
+
+touch(__DIR__ . '/auto-created.txt');
+unlink(__DIR__ . '/auto-created.txt');
+```
 
 #### Swoole Server Integration
 
