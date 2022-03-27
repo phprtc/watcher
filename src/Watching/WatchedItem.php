@@ -12,19 +12,25 @@ use JetBrains\PhpStorm\Pure;
 class WatchedItem
 {
     protected bool $isFile;
-    protected bool $isDir;
     protected string $dirName;
+    protected string $fullPath;
 
 
-    public function __construct(
+    #[Pure] public function __construct(
         protected string  $path,
         private EventInfo $eventInfo
     )
     {
-        $this->isFile = is_file($this->path);
-        $this->isDir = is_dir($this->path);
+        // Set full path
+        if (is_dir($this->path)) {
+            $this->fullPath = "$this->path/{$this->eventInfo->getEvent()['name']}";
+        } else {    // This is when a file is being watched
+            $this->fullPath = $this->path;
+        }
 
-        $this->dirName = pathinfo($this->path)['dirname'];
+        $this->isFile = is_file($this->fullPath);
+        $this->dirName = pathinfo($this->fullPath)['dirname'];
+
     }
 
     /**
@@ -37,11 +43,7 @@ class WatchedItem
 
     #[Pure] public function getFullPath(): string
     {
-        if ($this->isDir()) {
-            return "{$this->getPath()}/{$this->eventInfo->getEvent()['name']}";
-        }
-
-        return $this->getPath();
+        return $this->fullPath;
     }
 
     /**
@@ -57,7 +59,7 @@ class WatchedItem
      */
     public function isDir(): bool
     {
-        return $this->isDir;
+        return !$this->isFile;
     }
 
     /**
