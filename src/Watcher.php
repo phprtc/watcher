@@ -312,8 +312,8 @@ class Watcher
     /**
      * Proxy of Watcher::watch()
      *
-     * @see Watcher::watch()
      * @return void
+     * @see Watcher::watch()
      */
     public function start(): void
     {
@@ -327,11 +327,13 @@ class Watcher
      */
     public function stop(): void
     {
-        // Ask Swoole to remote watcher on this FD
-        SwooleEvent::del($this->inotifyFD);
-        // Close inotify FD resource
-        fclose($this->inotifyFD);
-        // Delete the var content
-        unset($this->inotifyFD);
+        if (isset($this->inotifyFD)) {
+            // Ask Swoole to remote watcher on this FD
+            SwooleEvent::del($this->inotifyFD);
+            // Close inotify FD resource
+            fclose($this->inotifyFD);
+            // Delete the var content
+            unset($this->inotifyFD);
+        }
     }
 }
