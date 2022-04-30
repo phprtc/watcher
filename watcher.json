@@ -1,0 +1,9 @@
+{
+  "paths": [
+    ".test1",
+    ".test2"
+  ],
+  "ignore": [
+    "/test1/t/.*(\\.php$)"
+  ]
+}

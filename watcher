@@ -1,0 +1,21 @@
+#!/usr/bin/env php
+<?php
+
+declare (strict_types=1);
+
+use RTC\Watcher\CLI\Commands\BaseCommand;
+use Symfony\Component\Console\Application;
+
+const ROOT_DIR = __DIR__ . '/';
+
+require __DIR__.'/vendor/autoload.php';
+
+$application = new Application();
+
+$baseCommand = new BaseCommand();
+
+$application->add($baseCommand);
+
+$application->setDefaultCommand((string)$baseCommand->getName());
+
+$application->run();

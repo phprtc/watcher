@@ -1,6 +1,6 @@
 parameters:
     level: 8
-    paths: ['src', 'tests']
+    paths: ['src', 'tests', 'watcher']
     checkMissingIterableValueType: false
     checkGenericClassInNonGenericObjectType: false
     ignoreErrors:
