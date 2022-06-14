@@ -136,7 +136,7 @@ class Watcher
     protected function inotifyRemovePathWatch(EventInfo $eventInfo): void
     {
         $descriptor = $eventInfo->getWatchDescriptor();
-        if ($eventInfo->getWatchedItem()->getFullPath() != $this->watchedItems[$descriptor]){
+        if ($eventInfo->getWatchedItem()->getFullPath() != $this->watchedItems[$descriptor]) {
             return;
         }
 
@@ -234,7 +234,7 @@ class Watcher
 
             // INDIVIDUAL LISTENERS
             foreach ($inotifyEvents as $inotifyEvent) {
-               // var_export($inotifyEvent);
+                // var_export($inotifyEvent);
                 // Make sure that we support this event
                 if (in_array($inotifyEvent['mask'], $this->watchedMasks)) {
                     $this->fireEvent($inotifyEvent);
@@ -257,11 +257,16 @@ class Watcher
     /**
      * Add file extension filter
      *
-     * @param string $extension
+     * @param string|array $extension
      * @return $this
      */
-    public function addExtension(string $extension): Watcher
+    public function addExtension(string|array $extension): Watcher
     {
+        if (is_array($extension)) {
+            $this->extensions = array_merge($this->extensions, $extension);
+            return $this;
+        }
+
         $this->extensions[] = $extension;
         return $this;
     }
@@ -269,11 +274,16 @@ class Watcher
     /**
      * Add path to watch
      *
-     * @param string $path
+     * @param string|array $path
      * @return $this
      */
-    public function addPath(string $path): Watcher
+    public function addPath(string|array $path): Watcher
     {
+        if (is_array($path)) {
+            $this->paths = array_merge($this->paths, $path);
+            return $this;
+        }
+
         $this->paths[] = $path;
         return $this;
     }
