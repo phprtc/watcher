@@ -4,10 +4,20 @@ namespace RTC\Tests\Watcher;
 
 use PHPUnit\Framework\TestCase;
 use RTC\Watcher\Watching\EventInfo;
+use Swoole\Timer;
 use function Co\run;
 
 class WatcherTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (!file_exists(__DIR__ . '/bait')) {
+            mkdir(__DIR__ . '/bait');
+        }
+    }
+
     public function testFileAndDirectoryCreation(): void
     {
         run(function () {
@@ -152,7 +162,6 @@ class WatcherTest extends TestCase
             touch($baitFile);
             file_put_contents($baitFile, uniqid());
             unlink($baitFile);
-            rmdir($baitDir);
         });
     }
 }
