@@ -4,6 +4,7 @@ namespace RTC\Tests\Watcher;
 
 use PHPUnit\Framework\TestCase;
 use RTC\Watcher\Watching\EventInfo;
+use Swoole\Coroutine;
 use Swoole\Timer;
 use function Co\run;
 
@@ -128,14 +129,11 @@ class WatcherTest extends TestCase
 
             $watcher->addPath(__DIR__ . '/bait')
                 ->onCreate(function (EventInfo $eventInfo) use ($baitDir, $baitFile): void {
-                    static $calls = 0;
-                    $calls += 1;
-
-                    if ($calls == 1) {
+                    if ($eventInfo->getWatchedItem()->isDir()) {
                         self::assertSame($baitDir, $eventInfo->getWatchedItem()->getFullPath());
                     }
 
-                    if ($calls == 2) {
+                    if ($eventInfo->getWatchedItem()->isFile()) {
                         self::assertSame($baitFile, $eventInfo->getWatchedItem()->getFullPath());
                     }
                 })
@@ -159,9 +157,13 @@ class WatcherTest extends TestCase
                 ->start();
 
             mkdir($baitDir);
+            Coroutine::usleep(1000);
             touch($baitFile);
+            Coroutine::usleep(1000);
             file_put_contents($baitFile, uniqid());
             unlink($baitFile);
+            Coroutine::usleep(1000);
+            rmdir($baitDir);
         });
     }
 }
