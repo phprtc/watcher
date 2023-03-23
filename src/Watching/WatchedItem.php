@@ -16,9 +16,9 @@ class WatchedItem
     protected string $fullPath;
 
 
-    #[Pure] public function __construct(
-        protected string  $path,
-        private EventInfo $eventInfo
+    public function __construct(
+        protected readonly string  $path,
+        private readonly EventInfo $eventInfo
     )
     {
         // Set full path
@@ -29,8 +29,13 @@ class WatchedItem
         }
 
         $this->isFile = is_file($this->fullPath);
-        $this->dirName = pathinfo($this->fullPath)['dirname'];
+        $dirName = pathinfo($this->fullPath)['dirname'] ?? null;
 
+        if (!$dirName) {
+            throw new \RuntimeException('Something went wrong, failed to acquire file info');
+        }
+
+        $this->dirName = $dirName;
     }
 
     /**

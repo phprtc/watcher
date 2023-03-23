@@ -9,6 +9,7 @@ use RecursiveIteratorIterator;
 use RTC\Watcher\Watching\EventInfo;
 use RTC\Watcher\Watching\EventTrait;
 use RTC\Watcher\Watching\WatchedItem;
+use SplFileInfo;
 use Swoole\Event as SwooleEvent;
 
 class Watcher
@@ -20,7 +21,7 @@ class Watcher
     protected mixed $inotifyFD;
     protected array $paths = [];
     protected array $extensions = [];
-    protected array $ignorePaths = [];
+    protected array $ignoredPaths = [];
     protected array $watchedItems = [];
 
     protected readonly int $maskItemCreated;
@@ -96,10 +97,15 @@ class Watcher
         if (is_dir($path)) {
             $iterator = new RecursiveDirectoryIterator($path);
 
-            // Loop through files
+            /**
+             * Loop through files
+             *
+             * @var SplFileInfo $file
+             */
             foreach (new RecursiveIteratorIterator($iterator) as $file) {
-                if ($file->isDir() && !in_array($file->getRealPath(), $this->watchedItems)) {
-                    $this->inotifyWatchPath($file->getRealPath());
+                $realPath = $file->getRealPath();
+                if (is_string($realPath) && $file->isDir() && !in_array($realPath, $this->watchedItems)) {
+                    $this->inotifyWatchPath($realPath);
                 }
             }
 
@@ -180,8 +186,9 @@ class Watcher
             if ($shouldFireEvent) {
                 $eventInfo = new EventInfo($inotifyEvent, $this->watchedItems[$inotifyEvent['wd']]);
 
-                foreach ($this->ignorePaths as $ignorePath) {
-                    if (1 === preg_match("@$ignorePath@", $eventInfo->getWatchedItem()->getFullPath())) {
+                foreach ($this->ignoredPaths as $ignoredPath) {
+                    $ignoredPath = str_replace("@", '\@', $ignoredPath);
+                    if (1 === preg_match("@$ignoredPath@", $eventInfo->getWatchedItem()->getFullPath())) {
                         return;
                     }
                 }
@@ -313,11 +320,11 @@ class Watcher
     public function ignore(array|string $path): Watcher
     {
         if (is_string($path)) {
-            $this->ignorePaths[] = $path;
+            $this->ignoredPaths[] = $path;
             return $this;
         }
 
-        $this->ignorePaths = array_merge($this->ignorePaths, $path);
+        $this->ignoredPaths = array_merge($this->ignoredPaths, $path);
         return $this;
     }
 

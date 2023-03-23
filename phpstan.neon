@@ -5,3 +5,5 @@ parameters:
     checkGenericClassInNonGenericObjectType: false
     ignoreErrors:
         - '#Attribute class JetBrains\\PhpStorm.*#'
+        - '#Used function Swoole\\Coroutine\\run not found#'
+        - '#Function Swoole\\Coroutine\\run not found.*#'
