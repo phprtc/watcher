@@ -97,11 +97,15 @@ class Watcher
         if (is_dir($path)) {
             $iterator = new RecursiveDirectoryIterator($path);
 
-            // Loop through files
+            /**
+             * Loop through files
+             *
+             * @var SplFileInfo $file
+             */
             foreach (new RecursiveIteratorIterator($iterator) as $file) {
-                /**@var SplFileInfo $file**/
-                if ($file->isDir() && !in_array($file->getRealPath(), $this->watchedItems)) {
-                    $this->inotifyWatchPath($file->getRealPath());
+                $realPath = $file->getRealPath();
+                if (is_string($realPath) && $file->isDir() && !in_array($realPath, $this->watchedItems)) {
+                    $this->inotifyWatchPath($realPath);
                 }
             }
 

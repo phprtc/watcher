@@ -62,9 +62,8 @@ class WatcherTest extends TestCase
                 })
                 ->start();
 
-            Coroutine::sleep(0.2);
-            touch($fileToCreate);
             Coroutine::sleep(0.1);
+            touch($fileToCreate);
             mkdir($dirToCreate);
 
             unlink($fileToCreate);
@@ -196,12 +195,14 @@ class WatcherTest extends TestCase
 
             Coroutine::sleep(0.1);
             mkdir($baitDir);
-            Coroutine::sleep(0.2);
+            Coroutine::sleep(0.1);
             touch($baitFile);
+
             Coroutine::sleep(0.1);
             file_put_contents($baitFile, uniqid());
-            unlink($baitFile);
+
             Coroutine::sleep(0.1);
+            unlink($baitFile);
             rmdir($baitDir);
         });
     }
