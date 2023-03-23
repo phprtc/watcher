@@ -15,10 +15,10 @@
         "evenement/evenement": "^3.0"
     },
     "require-dev": {
-        "phpstan/phpstan": "^1.5",
-        "phpunit/phpunit": "^9.5",
-        "symfony/var-dumper": "^6.0",
-        "openswoole/ide-helper": "^4.10"
+        "phpstan/phpstan": "^1.10",
+        "phpunit/phpunit": "^9.6",
+        "symfony/var-dumper": "^6.2",
+        "openswoole/ide-helper": "^4.11"
     },
     "autoload": {
         "psr-4": {
