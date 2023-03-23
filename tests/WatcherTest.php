@@ -5,37 +5,45 @@ namespace RTC\Tests\Watcher;
 use PHPUnit\Framework\TestCase;
 use RTC\Watcher\Watching\EventInfo;
 use Swoole\Coroutine;
-use Swoole\Timer;
-use function Co\run;
+use function Swoole\Coroutine\run;
 
 class WatcherTest extends TestCase
 {
+    public function __construct(
+        protected readonly string $baitDir = __DIR__ . '/bait',
+    )
+    {
+        parent::__construct();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        if (!file_exists(__DIR__ . '/bait')) {
-            mkdir(__DIR__ . '/bait');
+        if (!file_exists($this->baitDir)) {
+            mkdir($this->baitDir);
         }
+    }
+
+    protected function tearDown(): void
+    {
+        if (file_exists($this->baitDir)) {
+            rmdir($this->baitDir);
+        }
+
+        parent::tearDown();
     }
 
     public function testFileAndDirectoryCreation(): void
     {
-        run(function () {
-            $fileToCreate = __DIR__ . '/bait/test.txt';
-            $dirToCreate = __DIR__ . '/bait/test';
-
-            if (file_exists($fileToCreate)) {
-                unlink($fileToCreate);
-            }
-
-            if (file_exists($dirToCreate)) {
-                rmdir($dirToCreate);
-            }
+        run(function (): void {
+            $fileToCreate = $this->baitDir('test.txt');
+            $dirToCreate = $this->baitDir('test');
 
             $watcher = TWatcher::create();
 
-            $watcher->addPath(__DIR__ . '/bait')
+            $watcher
+                ->addPath($this->baitDir)
                 ->onCreate(function (EventInfo $eventInfo) use ($fileToCreate, $dirToCreate, &$watcher) {
                     static $calls = 0;
                     $calls += 1;
@@ -54,28 +62,29 @@ class WatcherTest extends TestCase
                 })
                 ->start();
 
+            Coroutine::sleep(0.2);
             touch($fileToCreate);
+            Coroutine::sleep(0.1);
             mkdir($dirToCreate);
+
+            unlink($fileToCreate);
+            rmdir($dirToCreate);
         });
     }
 
     public function testFileAndDirectoryDeletion(): void
     {
-        run(function () {
-            $fileToDelete = __DIR__ . '/bait/test.txt';
-            $dirToDelete = __DIR__ . '/bait/testy';
+        run(function (): void {
+            $fileToDelete = $this->baitDir('testy.txt');
+            $dirToDelete = $this->baitDir('testy');
 
-            if (!file_exists($fileToDelete)) {
-                touch($fileToDelete);
-            }
-
-            if (!file_exists($dirToDelete)) {
-                mkdir($dirToDelete);
-            }
+            touch($fileToDelete);
+            mkdir($dirToDelete);
 
             $watcher = TWatcher::create();
 
-            $watcher->addPath(__DIR__ . '/bait')
+            $watcher
+                ->addPath($this->baitDir)
                 ->onDelete(function (EventInfo $eventInfo) use ($fileToDelete, $dirToDelete, &$watcher) {
                     static $calls = 0;
                     $calls += 1;
@@ -98,16 +107,14 @@ class WatcherTest extends TestCase
 
     public function testFileChange(): void
     {
-        run(function () {
-            $fileToUpdate = __DIR__ . '/bait/test.txt';
-
-            if (!file_exists($fileToUpdate)) {
-                touch($fileToUpdate);
-            }
+        run(function (): void {
+            $fileToUpdate = $this->baitDir('test.txt');
+            touch($fileToUpdate);
 
             $watcher = TWatcher::create();
 
-            $watcher->addPath(__DIR__ . '/bait')
+            $watcher
+                ->addPath($this->baitDir)
                 ->onChange(function (EventInfo $eventInfo) use ($fileToUpdate, &$watcher) {
                     self::assertSame($fileToUpdate, $eventInfo->getWatchedItem()->getFullPath());
                     $watcher->stop();
@@ -120,14 +127,45 @@ class WatcherTest extends TestCase
         });
     }
 
+    public function testDirWithSpecialChars(): void
+    {
+        run(function (): void {
+            $watcher = TWatcher::create();
+            $baitDir = $this->baitDir('@hello');
+            $baitFile = $baitDir . '/world.txt';
+
+            mkdir($baitDir);
+            self::assertDirectoryExists($baitDir);
+
+            $watcher
+                ->addPath($baitDir)
+                ->onCreate(function (EventInfo $eventInfo) use ($baitFile, $watcher): void {
+                    if ($eventInfo->getWatchedItem()->isFile()) {
+                        self::assertSame($baitFile, $eventInfo->getWatchedItem()->getFullPath());
+                    }
+
+                    $watcher->stop();
+                })
+                ->start();
+
+            touch($baitFile);
+            Coroutine::sleep(0.1);
+            unlink($baitFile);
+
+            rmdir($baitDir);
+            self::assertDirectoryDoesNotExist($baitDir);
+        });
+    }
+
     public function testCreateChangeDeleteOnTheFly(): void
     {
         run(function () {
             $watcher = TWatcher::create();
-            $baitDir = __DIR__ . '/bait/dir-on-the-fly';
-            $baitFile = __DIR__ . '/bait/dir-on-the-fly/bait.txt';
+            $baitDir = $this->baitDir('dir-on-the-fly');
+            $baitFile = $baitDir . '/bait.txt';
 
-            $watcher->addPath(__DIR__ . '/bait')
+            $watcher
+                ->addPath($this->baitDir)
                 ->onCreate(function (EventInfo $eventInfo) use ($baitDir, $baitFile): void {
                     if ($eventInfo->getWatchedItem()->isDir()) {
                         self::assertSame($baitDir, $eventInfo->getWatchedItem()->getFullPath());
@@ -156,14 +194,21 @@ class WatcherTest extends TestCase
                 })
                 ->start();
 
+            Coroutine::sleep(0.1);
             mkdir($baitDir);
-            Coroutine::usleep(1000);
+            Coroutine::sleep(0.2);
             touch($baitFile);
-            Coroutine::usleep(1000);
+            Coroutine::sleep(0.1);
             file_put_contents($baitFile, uniqid());
             unlink($baitFile);
-            Coroutine::usleep(1000);
+            Coroutine::sleep(0.1);
             rmdir($baitDir);
         });
+    }
+
+
+    private function baitDir(string $path): string
+    {
+        return "$this->baitDir/$path";
     }
 }
